@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:18.7
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jobs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jobs}
+      POSTGRES_DB: ${POSTGRES_DB:-jobs}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql # PG 18+ image stores data under this path
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jobs}"]
+      interval: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:9.19
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
+  redis:
+    image: redis:8.10.3
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  worker:
+    build: ./backend
+    command: celery -A app.celery_app worker --pool=solo -l info
+    env_file:
+      - path: ./backend/.env # Azure keys; optional so the worker runs without AI
+        required: false
+    environment:
+      # Inside Docker, reach the other services by name, not localhost.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-jobs}:${POSTGRES_PASSWORD:-jobs}@postgres:5432/${POSTGRES_DB:-jobs}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  redis_data:
