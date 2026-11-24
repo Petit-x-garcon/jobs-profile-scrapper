@@ -40,3 +40,11 @@ async def test_unconfigured_raises(monkeypatch):
     monkeypatch.setattr(service.settings, "azure_openai_endpoint", None)
     with pytest.raises(AIUnavailable):
         await service.enrich("j", "p")
+
+
+async def test_extract_profile_parses_cv():
+    c = _client('{"headline": "Dev", "summary": "s", "skills": ["Go"], "years_experience": 3.6}')
+    with patch.object(service, "_client", return_value=c):
+        r = await service.extract_profile("cv " * 20000)
+    assert (r.skills, r.years_experience, r.experience) == (["Go"], 4, [])
+    assert len(c.chat.completions.create.await_args.kwargs["messages"][1]["content"]) == 20000

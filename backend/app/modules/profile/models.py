@@ -20,6 +20,10 @@ class Profile(Base):
     remote_ok: Mapped[bool]
     min_salary: Mapped[int | None] = mapped_column(Integer)
     summary: Mapped[str] = mapped_column(Text)
+    experience: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    education: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    projects: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    certifications: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

@@ -10,7 +10,7 @@ paths:
 
 ## API modules (`apps/web/lib/api/`)
 - One module per backend resource. Each exports zod schemas, `z.infer` types and plain `async` request functions.
-- Every request goes through the shared axios client in `lib/api/client.ts` (auth header, error handling). Never call `fetch` or axios from components or hooks.
+- Every request goes through the shared axios client in `lib/api/client.ts`. Never call `fetch` or axios from components or hooks.
 - `.parse()` every response with its zod schema. Use `.nullish()` for fields the backend may omit; never `z.any()`.
 - Build query strings with `URLSearchParams` and keep the backend's trailing slashes.
 
@@ -19,7 +19,7 @@ paths:
 - Query keys are arrays starting with the resource name (`["users", page, search]`). Every parameter that changes the result goes in the key. Shared keys live in one exported constant.
 
 ## Client state (zustand)
-- Only for state shared across distant parts of the tree (for example auth). Use `useState` or context for local state.
+- Only for state shared across distant parts of the tree (for example filters). Use `useState` or context for local state.
 - Never copy server data into a store; TanStack Query is the cache.
 
 ## Errors

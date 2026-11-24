@@ -1,13 +1,15 @@
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist_Mono, Poppins } from "next/font/google"
 
 import "@workspace/ui/globals.css"
 import { SiteNav } from "@/components/shared/site-nav"
 import { ThemeProvider } from "@/components/theme-provider"
 import { QueryProvider } from "@/providers/query-provider"
 
-const fontSans = Geist({
+// Poppins has no variable version, so each weight is listed.
+const fontSans = Poppins({
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
 })
 
@@ -33,7 +35,9 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             <SiteNav />
-            <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
+            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-10">
+              {children}
+            </main>
           </QueryProvider>
         </ThemeProvider>
       </body>

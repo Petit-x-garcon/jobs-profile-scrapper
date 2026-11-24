@@ -18,6 +18,19 @@ const list = (v: string) =>
     .map((s) => s.trim())
     .filter(Boolean)
 
+const lines = (v: string) =>
+  v
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+const SECTIONS = [
+  { name: "experience", label: "Work experience" },
+  { name: "education", label: "Education" },
+  { name: "projects", label: "Projects" },
+  { name: "certifications", label: "Certifications" },
+] as const
+
 function Field({
   id,
   label,
@@ -52,6 +65,10 @@ function Form({ profile }: { profile: Profile }) {
         remote_ok: d.get("remote_ok") === "on",
         min_salary: salary === "" ? null : Number(salary),
         summary: str("summary"),
+        experience: lines(str("experience")),
+        education: lines(str("education")),
+        projects: lines(str("projects")),
+        certifications: lines(str("certifications")),
       },
       {
         onSuccess: () => toast.success("Profile saved"),
@@ -114,8 +131,19 @@ function Form({ profile }: { profile: Profile }) {
           defaultValue={profile.summary}
         />
       </Field>
+      {SECTIONS.map(({ name, label }) => (
+        <Field key={name} id={name} label={`${label} (one per line)`}>
+          <Textarea
+            id={name}
+            name={name}
+            rows={4}
+            defaultValue={profile[name].join("\n")}
+          />
+        </Field>
+      ))}
       <p className="text-muted-foreground text-sm">
-        Saving re-scores all jobs against this profile.
+        Saving clears AI match scores. Run Analyze with AI again on the jobs
+        page.
       </p>
       <Button type="submit" disabled={update.isPending} className="self-start">
         Save profile
@@ -127,8 +155,14 @@ function Form({ profile }: { profile: Profile }) {
 export function ProfileForm() {
   const { data, error, isPending } = useProfile()
   return (
-    <div className="flex max-w-xl flex-col gap-4">
-      <h1 className="text-xl font-semibold">Profile</h1>
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold">Profile details</h2>
+        <p className="text-muted-foreground text-sm">
+          Filled from your CV. Review and correct anything the extraction got
+          wrong.
+        </p>
+      </div>
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error.message}</AlertDescription>
@@ -136,6 +170,6 @@ export function ProfileForm() {
       )}
       {isPending && !error && <Skeleton className="h-96 w-full" />}
       {data && <Form key={data.updated_at} profile={data} />}
-    </div>
+    </section>
   )
 }

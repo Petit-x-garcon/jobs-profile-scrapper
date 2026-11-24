@@ -3,8 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.modules.cv.router import router as cv_router
 from app.modules.jobs.router import router as jobs_router
 from app.modules.profile.router import router as profile_router
+from app.modules.recommendations.router import router as recommendations_router
+from app.modules.site_check.router import router as site_check_router
 from app.shared.exceptions import AppException
 
 app = FastAPI(title="Job Scraper")
@@ -33,4 +36,7 @@ async def health() -> dict[str, str]:
 
 api.include_router(jobs_router)
 api.include_router(profile_router)
+api.include_router(cv_router)
+api.include_router(recommendations_router)
+api.include_router(site_check_router)
 app.include_router(api)

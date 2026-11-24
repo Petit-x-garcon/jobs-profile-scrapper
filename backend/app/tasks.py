@@ -8,29 +8,27 @@ from app.modules.jobs import service as jobs_service
 logger = logging.getLogger(__name__)
 
 
-async def _scrape_and_enrich(query: str) -> None:
+async def _scrape_jobs(query: str) -> None:
     from app.modules.scraper.service import scrape  # lazy: module owned elsewhere
+    from app.modules.site_check.service import list_source_urls, scrape_source
 
+    async with task_session() as db:
+        urls = await list_source_urls(db)
     scraped = await scrape(query)
+    for url in urls:
+        try:
+            job = await asyncio.wait_for(scrape_source(url), timeout=60)
+        except Exception as exc:
+            logger.warning("Failed to scrape a saved source (%s)", type(exc).__name__)
+            continue
+        if job is not None:
+            scraped.append(job)
     async with task_session() as db:
         added = await jobs_service.save_scraped([j.model_dump() for j in scraped], db)
-        enriched = await jobs_service.enrich_pending(db)
-    logger.info("Scraped %d, added %d, enriched %d", len(scraped), added, enriched)
-
-
-async def _enrich_pending() -> None:
-    async with task_session() as db:
-        enriched = await jobs_service.enrich_pending(db)
-    logger.info("Enriched %d jobs", enriched)
+    logger.info("Scraped %d, added %d", len(scraped), added)
 
 
 @celery_app.task
-def scrape_and_enrich(query: str) -> None:
-    """Scrape, store new jobs, then enrich only un-enriched ones."""
-    asyncio.run(_scrape_and_enrich(query))
-
-
-@celery_app.task
-def enrich_pending() -> None:
-    """Enrich jobs that lack a summary or score."""
-    asyncio.run(_enrich_pending())
+def scrape_jobs(query: str) -> None:
+    """Scrape all sources and store new jobs. AI analysis runs only when the user asks."""
+    asyncio.run(_scrape_jobs(query))

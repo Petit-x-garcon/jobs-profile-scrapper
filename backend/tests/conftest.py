@@ -1,5 +1,4 @@
 from collections.abc import AsyncIterator
-from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -29,14 +28,7 @@ async def db(session_factory) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-def enqueue() -> MagicMock:
-    """Patched enqueue helper; no broker needed."""
-    with patch("app.modules.jobs.service._enqueue_enrich") as m:
-        yield m
-
-
-@pytest.fixture
-async def client(session_factory, enqueue) -> AsyncIterator[AsyncClient]:
+async def client(session_factory) -> AsyncIterator[AsyncClient]:
     async def _get_db() -> AsyncIterator[AsyncSession]:
         async with session_factory() as session:
             yield session

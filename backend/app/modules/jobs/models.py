@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -23,6 +23,8 @@ class Job(Base):
     summary: Mapped[str | None] = mapped_column(Text)
     score: Mapped[int | None] = mapped_column(Integer)
     match_reason: Mapped[str | None] = mapped_column(Text)
+    matching_skills: Mapped[list[str] | None] = mapped_column(JSON)
+    missing_skills: Mapped[list[str] | None] = mapped_column(JSON)
     scraped_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

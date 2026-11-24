@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class JobOut(BaseModel):
@@ -20,7 +20,22 @@ class JobOut(BaseModel):
     summary: str | None
     score: int | None
     match_reason: str | None
+    matching_skills: list[str] | None = None
+    missing_skills: list[str] | None = None
     scraped_at: datetime
+
+
+class JobQuery(BaseModel):
+    """List filters. `q` holds comma-separated keywords; every keyword must match."""
+
+    source: str | None = None
+    min_score: int | None = None
+    q: str | None = Field(default=None, max_length=200)
+
+    @property
+    def keywords(self) -> list[str]:
+        """Non-empty keywords from `q`."""
+        return [k.strip() for k in (self.q or "").split(",") if k.strip()]
 
 
 class ImportIn(BaseModel):

@@ -10,6 +10,7 @@ export type JobFilters = {
   size: number
   source?: string
   min_score?: number
+  q?: string
 }
 
 export type ImportJobInput = {

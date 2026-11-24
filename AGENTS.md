@@ -2,6 +2,8 @@
 
 Monorepo: `backend/` (FastAPI) and `frontend/` (Next.js). These rules are for writing code.
 
+Detailed rules per area live in `.claude/rules/`; see the "Topic rules" table in `backend/AGENTS.md` and `frontend/AGENTS.md`.
+
 ## General
 - Keep it simple. Reuse existing code before writing new code.
 - Small, focused files and functions. Split when a limit is passed.

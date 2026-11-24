@@ -12,3 +12,9 @@ class NotFound(AppException):
     """Resource does not exist."""
 
     status_code = 404
+
+
+class BadRequest(AppException):
+    """The request is invalid (bad input, unsupported file, unsafe URL)."""
+
+    status_code = 400

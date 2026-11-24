@@ -24,7 +24,7 @@ They live in `.claude/rules/` (the only copy), which Claude Code loads automatic
 
 | File | Applies to | Covers |
 |---|---|---|
-| `api-contract.md` | everything | URLs, auth, error shape, pagination, SSE frames shared with the backend |
+| `api-contract.md` | everything | URLs, error shape, pagination shared with the backend |
 | `frontend-data.md` | `apps/web/lib`, `hooks`, `components`, `app` | API client, zod schemas, TanStack Query, zustand |
 | `frontend-ui.md` | `apps/web/components`, `app`, `packages/ui` | shadcn/ui, Tailwind, colors, responsive layout, icons |
 | `frontend-typescript.md` | any `.ts` / `.tsx` file | Types, naming, client vs server components, size limits |
@@ -36,7 +36,7 @@ Run from `frontend/`. The backend must be running (default `http://localhost:800
 
 ```bash
 npm install
-npm run dev                         # http://localhost:3000 (all workspaces, via turbo)
+npm run dev -w web                  # http://localhost:3000 (web app only, no turbo)
 npm run build                       # production build
 npm run lint                        # ESLint, all workspaces
 npm run typecheck                   # tsc --noEmit, all workspaces
@@ -49,34 +49,29 @@ npx prettier --check "apps/web/**/*.{ts,tsx}"
 cd apps/web && npx shadcn@latest add <component>   # add a shadcn/ui component into packages/ui
 ```
 
-There are no automated frontend tests yet. Check UI changes in the browser at mobile and desktop widths, in both `km` and `en`.
+There are no automated frontend tests yet. Check UI changes in the browser at mobile and desktop widths, in light and dark themes.
 
 ## Definition of done
 
 1. `npm run lint` and `npm run typecheck` pass.
 2. The files you changed are formatted (`npx prettier --write <files>`). Don't reformat unrelated files in a feature change.
-3. Every new user-facing string exists in both `messages/km.json` and `messages/en.json`.
-4. A backend response shape you rely on matches the zod schema in `lib/api/` (see `api-contract.md`).
-5. The page works at small, medium and large widths, and in light and dark themes.
+3. A backend response shape you rely on matches the zod schema in `lib/api/schemas.ts` (see `api-contract.md`).
+4. The page works at small, medium and large widths, and in light and dark themes.
 
 ## Environment
 
 `apps/web/.env` (never edit, print or commit it):
-- `BACKEND_URL`: where the `/api` proxy and the speech WebSocket rewrite send requests (server side). Default `http://localhost:8000`.
-- `NEXT_PUBLIC_API_URL`: base URL the browser client uses. Default `/api`, the proxy; leave it unset in normal setups.
+- `NEXT_PUBLIC_API_URL`: backend base URL the axios client calls. Default `http://localhost:8000`.
 
 ## Layout (`apps/web`)
 
 | Path | Holds |
 |---|---|
-| `app/` | Routes, and `api/[...path]/route.ts` (the backend proxy) |
+| `app/` | Routes |
 | `components/<feature>/` | Feature UI, one folder per feature (mirrors the backend modules), plus `shared/` and `layout/` |
-| `lib/api/<resource>.ts` | One module per backend resource: zod schemas + request functions; `client.ts` is the axios client |
-| `lib/stores/` | zustand stores (for example `auth-store`) |
-| `lib/schemas.ts`, `lib/format.ts` | Shared zod helpers (`paginated`), date and size formatting |
+| `lib/api/<resource>.ts` | One module per backend resource with its request functions; zod schemas in `schemas.ts`; `client.ts` is the axios client |
 | `hooks/` | Shared hooks |
-| `providers/` | App-wide providers (React Query, theme, intl) |
-| `i18n/`, `messages/` | next-intl config and one message file per locale |
+| `providers/` | App-wide providers (React Query) |
 
 Folders are created when the first feature needs them; not all exist yet.
 
@@ -87,7 +82,6 @@ Folders are created when the first feature needs them; not all exist yet.
 - **Validation:** zod for API responses, forms and environment values.
 - **Server state:** TanStack Query. Never fetch in `useEffect`.
 - **Client state:** zustand for state shared across the tree; `useState` or context for local state.
-- **i18n:** `next-intl`, strictly two locales: `km` and `en` other can add on later. `DEFAULT_LOCALE` in `i18n/routing.ts` are the only places to change it per project. No hard-coded user-facing strings.
 - **Layout:** responsive and mobile-first, for small, medium and large screens.
-- **Fonts:** Noto Sans Khmer via `next/font/google` (khmer + latin subsets).
+- **Fonts:** Poppins (400–700) and Geist Mono via `next/font/google`.
 - **Colors:** flat, solid colors only. No gradients and no pastel palettes.

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://jobs:jobs@localhost:5432/jobs"
+    database_url: str = "postgresql+asyncpg://job_user:job_password@localhost:5432/job_scraper"
     redis_url: str = "redis://localhost:6379/0"
     cors_origins: str = "http://localhost:3000"  # comma-separated
     azure_openai_endpoint: str | None = None

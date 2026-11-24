@@ -9,7 +9,7 @@ function bandClass(score: number) {
 }
 
 export function ScoreBadge({ score }: { score: number | null | undefined }) {
-  if (score == null) return <Badge variant="outline">Not scored</Badge>
+  if (score == null) return <Badge variant="outline">Not analyzed</Badge>
   return (
     <Badge className={cn(bandClass(score))}>{Math.round(score)} / 100</Badge>
   )

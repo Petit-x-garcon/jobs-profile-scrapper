@@ -9,8 +9,8 @@ They live in `.claude/rules/` (the only copy), which Claude Code loads automatic
 | File | Applies to | Covers |
 |---|---|---|
 | `backend-architecture.md` | all backend code | Modular monolith: folder layout, module boundaries, adding a module |
-| `api-contract.md` | all backend code | URLs, auth header, error shape, pagination, SSE frames shared with the frontend |
-| `backend-api.md` | `router`, `service`, `schemas`, `dependencies`, `exceptions` files, `app/shared` | Routers, services, schemas, error classes, SSE |
+| `api-contract.md` | all backend code | URLs, error shape, pagination shared with the frontend |
+| `backend-api.md` | `router`, `service`, `schemas`, `dependencies`, `exceptions` files, `app/shared` | Routers, services, schemas, error classes |
 | `backend-database.md` | `models`, `repository` files, `alembic/` | Models, repositories, transactions, migrations |
 | `backend-celery.md` | `app/tasks.py`, `app/celery_app.py` | Background jobs |
 | `backend-testing.md` | `tests/` | Test layout, mocking, fixtures |
@@ -22,8 +22,8 @@ Run from `backend/`. `docker compose up -d` (repo root) starts the infrastructur
 
 ```bash
 uv sync                                                # install dependencies
-uv run uvicorn app.main:app --reload                   # API :8000, docs at /docs
-uv run celery -A app.worker.celery_app worker -l info --pool=solo
+uv run fastapi dev app/main.py                         # API :8000 with reload, docs at /docs
+uv run celery -A app.celery_app worker -l info --pool=solo   # only if not using the Docker worker
 #   --pool=solo: the default prefork pool doesn't run on Windows. No auto-reload: restart after task changes.
 
 uv run ruff check --fix                                # lint + sort imports (run from backend/)
@@ -61,7 +61,7 @@ Code is grouped by business module under `app/modules/<module>/`, not by technic
 - Never share one `AsyncSession` between concurrent coroutines (`asyncio.gather`).
 
 **Auth**
-- Every endpoint declares its auth dependency explicitly; a public endpoint is deliberate and documented.
+- No auth yet: all endpoints are public.
 - Role and permission checks go through shared dependencies, never inline string comparisons.
 
 **Errors**

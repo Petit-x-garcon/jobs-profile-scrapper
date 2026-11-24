@@ -4,12 +4,23 @@ import asyncio
 import logging
 
 import httpx
+from bs4 import BeautifulSoup
 
 from app.modules.scraper.adapters import dodojob, jobify
 from app.modules.scraper.adapters._common import USER_AGENT
 from app.modules.scraper.schemas import JobIn
 
 logger = logging.getLogger(__name__)
+
+__all__ = ["USER_AGENT", "extract_text", "scrape"]
+
+
+def extract_text(html: str) -> str:
+    """Visible text of an HTML page (scripts and styles removed), one block per line."""
+    soup = BeautifulSoup(html, "lxml")
+    for tag in soup(["script", "style", "noscript", "template", "svg"]):
+        tag.decompose()
+    return soup.get_text("\n", strip=True)
 
 
 async def scrape(query: str, max_jobs_per_source: int = 30) -> list[JobIn]:

@@ -14,6 +14,10 @@ class ProfileIn(BaseModel):
     remote_ok: bool
     min_salary: int | None = None
     summary: str
+    experience: list[str] = []
+    education: list[str] = []
+    projects: list[str] = []
+    certifications: list[str] = []
 
 
 class ProfileOut(ProfileIn):

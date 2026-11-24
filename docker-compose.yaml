@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:18.7
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-jobs}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jobs}
-      POSTGRES_DB: ${POSTGRES_DB:-jobs}
+      POSTGRES_USER: ${POSTGRES_USER:-job_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-job_password}
+      POSTGRES_DB: ${POSTGRES_DB:-job_scraper}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql # PG 18+ image stores data under this path
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jobs}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-job_user}"]
       interval: 5s
       retries: 10
 
@@ -35,13 +35,14 @@ services:
 
   worker:
     build: ./backend
+    # pull_policy: build
     command: celery -A app.celery_app worker --pool=solo -l info
     env_file:
       - path: ./backend/.env # Azure keys; optional so the worker runs without AI
         required: false
     environment:
       # Inside Docker, reach the other services by name, not localhost.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-jobs}:${POSTGRES_PASSWORD:-jobs}@postgres:5432/${POSTGRES_DB:-jobs}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-job_user}:${POSTGRES_PASSWORD:-job_password}@postgres:5432/${POSTGRES_DB:-job_scraper}
       REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
