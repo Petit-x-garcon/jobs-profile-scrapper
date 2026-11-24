@@ -9,8 +9,8 @@ import { Skeleton } from "@workspace/ui/components/skeleton"
 import { ImportDialog } from "@/components/jobs/import-dialog"
 import { JobCard } from "@/components/jobs/job-card"
 import { JobFilters } from "@/components/jobs/job-filters"
+import { SavedSites } from "@/components/jobs/saved-sites"
 import { ScrapeControl } from "@/components/jobs/scrape-button"
-import { RecommendationsPanel } from "@/components/recommendations/recommendations-panel"
 import { useJobs } from "@/hooks/use-jobs"
 
 const SIZE = 20
@@ -22,12 +22,15 @@ export function JobsReport() {
   const [source, setSource] = useState<string>()
   const [minScore, setMinScore] = useState("")
   const parsed = minScore === "" ? NaN : Number(minScore)
-  const { data, error, isPending, isFetching, refetch } = useJobs({
-    page,
-    size: SIZE,
+  const filters = {
     source,
     min_score: Number.isNaN(parsed) ? undefined : parsed,
     q: keywords || undefined,
+  }
+  const { data, error, isPending, isFetching, refetch } = useJobs({
+    page,
+    size: SIZE,
+    ...filters,
   })
   const pages = data ? Math.max(1, Math.ceil(data.total / data.size)) : 1
 
@@ -39,7 +42,7 @@ export function JobsReport() {
             Job scraper
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Browse scraped and imported job postings.
+            Jobs appear in the order they were saved, newest first.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -49,6 +52,7 @@ export function JobsReport() {
           />
         </div>
       </div>
+      <SavedSites />
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-card p-4">
         <JobFilters
           keywords={keywords}
@@ -87,12 +91,6 @@ export function JobsReport() {
             <Skeleton key={i} className="h-52 w-full rounded-xl" />
           ))}
         </div>
-      )}
-      {data && data.items.length > 0 && (
-        <RecommendationsPanel
-          key={[page, keywords, source, minScore].join("|")}
-          jobIds={data.items.map((j) => j.id)}
-        />
       )}
       {data?.items.length === 0 && (
         <p className="py-10 text-center text-sm text-muted-foreground">

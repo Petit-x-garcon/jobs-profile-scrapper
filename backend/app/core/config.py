@@ -15,7 +15,6 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"  # comma-separated
     azure_openai_endpoint: str | None = None
     azure_openai_api_key: str | None = None
-    azure_openai_api_version: str = "2024-10-21"
     azure_openai_deployment: str | None = None
 
     @property

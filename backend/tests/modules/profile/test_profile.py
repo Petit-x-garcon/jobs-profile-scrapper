@@ -44,3 +44,27 @@ async def test_get_seeds_then_put_resets_scores(client, db):
     job = (await client.get("/api/jobs")).json()["items"][0]
     assert (job["score"], job["match_reason"], job["summary"]) == (None, None, "keep")
     assert (job["matching_skills"], job["missing_skills"]) == (None, None)
+
+
+async def test_cv_sections_round_trip(client):
+    work = {"company": "Example", "title": "Developer", "dates": "2024–Present"}
+    education = {"degree": "BSc", "university": "Example University", "year": "2023"}
+    response = await client.put(
+        "/api/profile",
+        json=PUT
+        | {
+            "contact": {"name": "Jane Doe", "city": "Phnom Penh"},
+            "experience": [work, "Previous role"],
+            "education": [education],
+            "awards": ["Engineering award"],
+            "years_experience": 0.75,
+        },
+    )
+    assert response.status_code == 200
+    profile = (await client.get("/api/profile")).json()
+    assert profile["contact"]["name"] == "Jane Doe"
+    assert profile["contact"]["email"] == ""
+    assert profile["experience"] == [work, "Previous role"]
+    assert profile["education"] == [education]
+    assert profile["awards"] == ["Engineering award"]
+    assert profile["years_experience"] == 0.75

@@ -8,6 +8,10 @@ export function useAnalyzeJobs() {
   return useMutation({
     mutationFn: analyzeJobs,
     // Scores are saved on the jobs, so the list can show them too.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: JOBS_KEY }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: JOBS_KEY }),
+        queryClient.invalidateQueries({ queryKey: ["job-rankings"] }),
+      ]),
   })
 }

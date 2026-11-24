@@ -9,8 +9,16 @@ from app.modules.ai.schemas import Enrichment
 from app.modules.jobs import service as jobs_service
 from app.modules.jobs.schemas import JobOut
 from app.modules.profile import service as profile_service
-from app.modules.recommendations.schemas import RecommendationsOut
+from app.modules.recommendations.matching import RoleMatcher, skill_patterns
+from app.modules.recommendations.schemas import (
+    LocalMatch,
+    RankingQuery,
+    RecommendationsOut,
+    ShortlistItem,
+    ShortlistQuery,
+)
 from app.shared.exceptions import NotFound
+from app.shared.pagination import Page
 
 logger = logging.getLogger(__name__)
 
@@ -57,3 +65,54 @@ async def analyze(job_ids: list[uuid.UUID], db: AsyncSession) -> Recommendations
         analyzed=len(pending) - failed,
         failed=failed,
     )
+
+
+async def shortlist(filters: RankingQuery, db: AsyncSession) -> Page[LocalMatch]:
+    """Prefer role matches, then distinct skills; stable ties keep the newest jobs first."""
+    profile = await profile_service.get_profile(db)
+    roles = RoleMatcher(profile.headline, profile.experience)
+    skills = skill_patterns(profile.skills)
+    ranked: list[tuple[uuid.UUID, bool, list[str]]] = []
+    async for job in jobs_service.iter_filtered_jobs(filters, db):
+        role = roles.matches(job.title)
+        text = f"{job.title}\n{job.description}"
+        matched = [skill for skill, pattern in skills if pattern.search(text)]
+        ranked.append((job.id, role, matched))
+    ranked.sort(key=lambda row: (row[1], len(row[2])), reverse=True)
+    size = 10
+    offset = (filters.page - 1) * size
+    visible = ranked[offset : offset + size]
+    jobs = {job.id: job for job in await jobs_service.get_jobs([row[0] for row in visible], db)}
+    items = [
+        LocalMatch(
+            rank=rank,
+            job=JobOut.model_validate(jobs[job_id]),
+            role_match=role,
+            matching_skills=matched,
+        )
+        for rank, (job_id, role, matched) in enumerate(visible, start=offset + 1)
+        if job_id in jobs
+    ]
+    return Page(items=items, page=filters.page, size=size, total=len(ranked))
+
+
+async def legacy_shortlist(
+    filters: ShortlistQuery, db: AsyncSession
+) -> list[ShortlistItem] | Page[LocalMatch]:
+    """Serve the original ten-item preview or an explicitly requested ranking page."""
+    query = RankingQuery(**filters.model_dump(exclude={"page"}), page=filters.page or 1)
+    ranked = await shortlist(query, db)
+    if filters.page is not None:
+        return ranked
+    return [
+        ShortlistItem(
+            id=row.job.id,
+            title=row.job.title,
+            company=row.job.company,
+            role_match=row.role_match,
+            matching_skills=row.matching_skills,
+            analyzed=row.job.score is not None,
+        )
+        for row in ranked.items
+        if row.role_match or row.matching_skills
+    ]

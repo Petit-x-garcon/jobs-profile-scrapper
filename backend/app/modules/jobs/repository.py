@@ -1,7 +1,10 @@
 import re
 import uuid
+from collections.abc import AsyncIterator
 
 from sqlalchemy import Select, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.jobs.models import Job
@@ -13,12 +16,13 @@ _SEARCHED = (Job.title, Job.company, Job.location, Job.description)
 
 async def upsert_many(jobs: list[dict], db: AsyncSession) -> int:
     """Insert jobs whose url is not stored yet; return how many were added."""
-    urls = {j["url"] for j in jobs}
-    existing = set(await db.scalars(select(Job.url).where(Job.url.in_(urls))))
-    new = {j["url"]: Job(**j) for j in jobs if j["url"] not in existing}  # dedupes within batch
-    db.add_all(new.values())
+    if not jobs:
+        return 0
+    insert = sqlite_insert if db.get_bind().dialect.name == "sqlite" else pg_insert
+    stmt = insert(Job).on_conflict_do_nothing(index_elements=[Job.url]).returning(Job.id)
+    inserted = (await db.scalars(stmt, jobs)).all()
     await db.commit()
-    return len(new)
+    return len(inserted)
 
 
 async def add(job: dict, db: AsyncSession) -> Job:
@@ -48,10 +52,7 @@ def _word_pattern(keyword: str) -> str:
     return f"(^|[^a-z0-9]){re.escape(keyword.lower())}([^a-z0-9]|$)"
 
 
-async def list_jobs(
-    filters: JobQuery, page: int, size: int, db: AsyncSession
-) -> tuple[list[Job], int]:
-    """Filtered page of jobs: best score first (nulls last), then newest."""
+def _filtered_jobs(filters: JobQuery) -> Select:
     stmt: Select = select(Job)
     if filters.source:
         stmt = stmt.where(Job.source == filters.source)
@@ -60,8 +61,24 @@ async def list_jobs(
     for keyword in filters.keywords:
         pattern = _word_pattern(keyword)
         stmt = stmt.where(or_(*(func.lower(col).regexp_match(pattern) for col in _SEARCHED)))
-    stmt = stmt.order_by(Job.score.desc().nulls_last(), Job.scraped_at.desc())
-    return await paginate(db, stmt, page, size)
+    return stmt.order_by(Job.scraped_at.desc(), Job.id.desc())
+
+
+async def iter_filtered_jobs(filters: JobQuery, db: AsyncSession) -> AsyncIterator[Job]:
+    """Stream filtered jobs newest first for the local shortlist."""
+    rows = await db.stream_scalars(_filtered_jobs(filters).execution_options(yield_per=200))
+    try:
+        async for job in rows:
+            yield job
+    finally:
+        await rows.close()
+
+
+async def list_jobs(
+    filters: JobQuery, page: int, size: int, db: AsyncSession
+) -> tuple[list[Job], int]:
+    """Filtered page of jobs: most recently saved first."""
+    return await paginate(db, _filtered_jobs(filters), page, size)
 
 
 async def reset_scores(db: AsyncSession) -> None:

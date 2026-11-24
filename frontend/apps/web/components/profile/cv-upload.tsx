@@ -1,6 +1,8 @@
 "use client"
 
+import { cn } from "cn"
 import { ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Alert, AlertDescription } from "@workspace/ui/components/alert"
@@ -18,7 +20,6 @@ import {
   CollapsibleTrigger,
 } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { useCv, useUploadCv } from "@/hooks/use-cv"
 import type { Cv } from "@/lib/api/schemas"
@@ -33,7 +34,7 @@ function CurrentCv({ cv }: { cv: Cv }) {
         <FileTextIcon className="size-4 shrink-0" />
         <span className="break-all">{cv.filename}</span>
       </div>
-      <p className="text-muted-foreground text-sm">
+      <p className="text-sm text-muted-foreground">
         Uploaded {new Date(cv.uploaded_at).toLocaleString()} ·{" "}
         {Math.ceil(cv.size_bytes / 1024)} KB
       </p>
@@ -44,7 +45,7 @@ function CurrentCv({ cv }: { cv: Cv }) {
             <ChevronDownIcon />
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="text-muted-foreground max-h-80 overflow-auto text-sm whitespace-pre-wrap">
+        <CollapsibleContent className="max-h-80 overflow-auto text-sm whitespace-pre-wrap text-muted-foreground">
           {cv.text}
         </CollapsibleContent>
       </Collapsible>
@@ -54,28 +55,14 @@ function CurrentCv({ cv }: { cv: Cv }) {
 
 export function CvUpload() {
   const { data: cv, error, isPending } = useCv()
-  const upload = useUploadCv()
-
-  function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = e.currentTarget
-    const file = new FormData(form).get("file")
-    if (!(file instanceof File) || file.size === 0) return
-    upload.mutate(file, {
-      onSuccess: () => {
-        toast.success("CV uploaded and profile updated")
-        form.reset()
-      },
-    })
-  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>CV</CardTitle>
         <CardDescription>
-          PDF or Word (.docx), up to 5 MB. Uploading replaces the current CV and
-          the profile details extracted from it.
+          Uploading replaces the current CV and the profile details extracted
+          from it.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -87,35 +74,114 @@ export function CvUpload() {
         )}
         {cv && <CurrentCv cv={cv} />}
         {cv === null && (
-          <p className="text-muted-foreground text-sm">No CV uploaded yet.</p>
+          <p className="text-sm text-muted-foreground">No CV uploaded yet.</p>
         )}
-        <form onSubmit={submit} className="flex flex-col gap-2">
-          <Label htmlFor="cv-file">{cv ? "Replace CV" : "Upload CV"}</Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              id="cv-file"
-              name="file"
-              type="file"
-              accept={ACCEPT}
-              required
-            />
-            <Button type="submit" disabled={upload.isPending}>
-              <UploadIcon className={upload.isPending ? "animate-pulse" : ""} />
-              {upload.isPending ? "Processing…" : "Upload"}
-            </Button>
-          </div>
-          {upload.isPending && (
-            <p className="text-muted-foreground text-sm" aria-live="polite">
-              Extracting your profile. This can take a few seconds.
-            </p>
-          )}
-        </form>
-        {upload.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{upload.error.message}</AlertDescription>
-          </Alert>
-        )}
+        <CvUploadField />
       </CardContent>
     </Card>
+  )
+}
+
+function CvUploadField() {
+  const input = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const upload = useUploadCv()
+
+  function selectFile(selected: File | undefined) {
+    if (!selected || upload.isPending) return
+    upload.reset()
+    const error = !/\.(pdf|docx)$/i.test(selected.name)
+      ? "Choose a PDF or Word (.docx) file."
+      : selected.size === 0 || selected.size > 5 * 1024 * 1024
+        ? "Choose a non-empty file up to 5 MB."
+        : null
+    setFileError(error)
+    setFile(error ? null : selected)
+  }
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!file || upload.isPending) return
+    upload.mutate(file, {
+      onSuccess: () => {
+        setFile(null)
+        toast.success("CV uploaded and profile updated")
+      },
+    })
+  }
+
+  const error = fileError ?? upload.error?.message
+
+  return (
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-3"
+      aria-label="Upload CV"
+    >
+      <Input
+        ref={input}
+        type="file"
+        accept={ACCEPT}
+        hidden
+        disabled={upload.isPending}
+        onChange={(event) => {
+          selectFile(event.currentTarget.files?.[0])
+          event.currentTarget.value = ""
+        }}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        disabled={upload.isPending}
+        aria-describedby="cv-file-format"
+        className={cn(
+          "h-auto w-full flex-col gap-2 rounded-xl border-dashed px-4 py-6 text-center whitespace-normal",
+          dragging && "border-primary bg-accent"
+        )}
+        onClick={() => input.current?.click()}
+        onDragOver={(event) => {
+          event.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault()
+          setDragging(false)
+          selectFile(event.dataTransfer.files[0])
+        }}
+      >
+        <UploadIcon className="size-5" />
+        <span>{file ? "Choose another CV" : "Choose or drop your CV"}</span>
+        <span id="cv-file-format" className="text-xs text-muted-foreground">
+          PDF or Word (.docx), up to 5 MB
+        </span>
+      </Button>
+      {file && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <p
+            className="flex min-w-0 flex-1 items-center gap-2 text-sm"
+            role="status"
+          >
+            <FileTextIcon className="size-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 wrap-anywhere">{file.name}</span>
+          </p>
+          <Button type="submit" disabled={upload.isPending}>
+            {upload.isPending ? "Processing…" : "Upload CV"}
+          </Button>
+        </div>
+      )}
+      {upload.isPending && (
+        <p className="text-sm text-muted-foreground" role="status">
+          Extracting your profile. This can take a few seconds.
+        </p>
+      )}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </form>
   )
 }

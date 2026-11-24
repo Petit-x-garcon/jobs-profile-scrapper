@@ -28,22 +28,68 @@ export const scrapeResponseSchema = z.object({ task_id: z.string() })
 
 export const profileInputSchema = z.object({
   headline: z.string(),
+  contact: z.object({
+    name: z.string(),
+    phone: z.string(),
+    email: z.string(),
+    city: z.string(),
+    linkedin: z.string(),
+    portfolio: z.string(),
+  }),
   skills: z.array(z.string()),
   years_experience: z.number(),
   locations: z.array(z.string()),
   remote_ok: z.boolean(),
   min_salary: z.number().nullable(),
   summary: z.string(),
-  experience: z.array(z.string()),
-  education: z.array(z.string()),
+  experience: z.array(
+    z.union([
+      z.string(),
+      z.object({ company: z.string(), title: z.string(), dates: z.string() }),
+    ])
+  ),
+  education: z.array(
+    z.union([
+      z.string(),
+      z.object({
+        degree: z.string(),
+        university: z.string(),
+        year: z.string(),
+      }),
+    ])
+  ),
   projects: z.array(z.string()),
   certifications: z.array(z.string()),
+  awards: z.array(z.string()),
 })
 
 export const profileSchema = profileInputSchema.extend({
   id: z.string(),
   updated_at: z.string(),
 })
+
+export const shortlistSchema = z.array(
+  z.object({
+    id: z.uuid(),
+    title: z.string(),
+    company: z.string().nullable(),
+    role_match: z.boolean(),
+    matching_skills: z.array(z.string()),
+    analyzed: z.boolean(),
+  })
+)
+
+export const rankingPageSchema = jobPageSchema.extend({
+  items: z.array(
+    z.object({
+      rank: z.number().int().positive(),
+      job: jobSchema,
+      role_match: z.boolean(),
+      matching_skills: z.array(z.string()),
+    })
+  ),
+})
+export type LocalMatch = z.infer<typeof rankingPageSchema>["items"][number]
 
 export const recommendationsSchema = z.object({
   items: z.array(jobSchema),
@@ -65,6 +111,13 @@ export const cvUploadSchema = z.object({
   profile: profileSchema,
 })
 
+export const crawlJobSchema = z.object({
+  url: z.url(),
+  title: z.string().min(1),
+  description: z.string().min(1),
+})
+export type CrawlJob = z.infer<typeof crawlJobSchema>
+
 export const siteCheckSchema = z.object({
   url: z.string(),
   final_url: z.string().nullish(),
@@ -73,6 +126,12 @@ export const siteCheckSchema = z.object({
   result: z.enum(["successful", "failed", "restricted", "inconclusive"]),
   message: z.string(),
   content_preview: z.string().nullish(),
+  links: z.array(z.string()).default([]),
+  jobs: z.array(crawlJobSchema).optional(),
+  job_tabs: z.record(z.string(), z.array(z.string())).optional(),
+  job_urls: z.array(z.string()).default([]),
+  content_text: z.string().nullish(),
+  job_count: z.number().int().nonnegative().nullish(),
 })
 
 export type Job = z.infer<typeof jobSchema>

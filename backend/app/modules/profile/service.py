@@ -26,7 +26,8 @@ async def get_profile(db: AsyncSession) -> Profile:
 async def update_profile(data: ProfileIn, db: AsyncSession) -> Profile:
     """Replace the profile and clear job scores so the next analysis uses it."""
     profile = await get_profile(db)
-    for field, value in data.model_dump().items():
+    omitted = {"contact", "awards"} - data.model_fields_set
+    for field, value in data.model_dump(exclude=omitted).items():
         setattr(profile, field, value)
     await jobs_service.reset_scores(db)
     return await repository.save(profile, db)
@@ -41,8 +42,11 @@ async def apply_cv(data: CVExtraction, db: AsyncSession) -> Profile:
     return profile
 
 
-def _section(title: str, items: list[str]) -> str:
-    return f"\n{title}:\n" + "\n".join(f"- {i}" for i in items) if items else ""
+def _section(title: str, items: list[str | dict[str, str]] | list[str]) -> str:
+    lines = [
+        item if isinstance(item, str) else " · ".join(filter(None, item.values())) for item in items
+    ]
+    return f"\n{title}:\n" + "\n".join(f"- {line}" for line in lines) if lines else ""
 
 
 def profile_text(profile: Profile) -> str:
@@ -50,11 +54,12 @@ def profile_text(profile: Profile) -> str:
     salary = f"\nMinimum salary: {profile.min_salary}" if profile.min_salary else ""
     return (
         f"{profile.headline}\nSkills: {', '.join(profile.skills)}\n"
-        f"Experience: {profile.years_experience} years\n"
+        f"Experience: {profile.years_experience:g} years\n"
         f"Locations: {', '.join(profile.locations)}\nRemote OK: {profile.remote_ok}{salary}\n"
         f"{profile.summary}"
         + _section("Work experience", profile.experience)
         + _section("Education", profile.education)
         + _section("Projects", profile.projects)
         + _section("Certifications", profile.certifications)
+        + _section("Awards", profile.awards)
     )

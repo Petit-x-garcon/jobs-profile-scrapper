@@ -21,7 +21,7 @@ async def test_list_pagination_and_order(client, db):
     now = datetime.now(UTC)
     await repository.upsert_many(
         [
-            _job("u1", score=10, scraped_at=now),
+            _job("u1", score=10, scraped_at=now - timedelta(seconds=1)),
             _job("u2", score=90, scraped_at=now),
             _job("u3", scraped_at=now + timedelta(seconds=1)),
         ],
@@ -30,7 +30,7 @@ async def test_list_pagination_and_order(client, db):
     body = (await client.get("/api/jobs", params={"page": 1, "size": 2})).json()
     assert set(body) == {"items", "total", "page", "size"}
     assert (body["total"], body["page"], body["size"]) == (3, 1, 2)
-    assert [i["url"] for i in body["items"]] == ["u2", "u1"]
+    assert [i["url"] for i in body["items"]] == ["u3", "u2"]
     assert (await client.get("/api/jobs", params={"min_score": 50})).json()["total"] == 1
     assert (await client.get("/api/jobs", params={"size": 101})).status_code == 422
 

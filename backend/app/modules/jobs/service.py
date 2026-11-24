@@ -1,11 +1,12 @@
 import uuid
+from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.ai.schemas import Enrichment
 from app.modules.jobs import repository
 from app.modules.jobs.models import Job
-from app.modules.jobs.schemas import ImportIn
+from app.modules.jobs.schemas import ImportIn, JobQuery
 from app.shared.exceptions import NotFound
 
 
@@ -63,3 +64,8 @@ def apply_analysis(job: Job, result: Enrichment) -> None:
 async def reset_scores(db: AsyncSession) -> None:
     """Drop all AI match data because the profile changed. The caller commits."""
     await repository.reset_scores(db)
+
+
+def iter_filtered_jobs(filters: JobQuery, db: AsyncSession) -> AsyncIterator[Job]:
+    """Iterate all jobs matching the Jobs page filters in recency order."""
+    return repository.iter_filtered_jobs(filters, db)

@@ -1,6 +1,6 @@
 import logging
 
-from openai import AsyncAzureOpenAI
+from openai import AsyncOpenAI
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import settings
@@ -27,11 +27,22 @@ SYSTEM_PROMPT = (
 CV_PROMPT = (
     "Extract the candidate's profile from this CV text. Use only facts in the CV. "
     'Reply with JSON only: {"headline": "current or target role, short", '
+    '"contact": {"name": "", "phone": "", "email": "", "city": "", "linkedin": "", '
+    '"portfolio": ""}, '
     '"summary": "2-4 sentence professional summary", "skills": [short skill names], '
-    '"years_experience": integer total years of professional experience, '
-    '"experience": ["Role at Company (dates): one-line highlights"], '
-    '"education": ["Degree, School (year)"], "projects": ["Name: one-line description"], '
-    '"certifications": ["Name (issuer, year)"]}. Use [] for missing sections.'
+    '"years_experience": number of years in professional jobs, including partial years, '
+    '"experience": [{"company": "", "title": "", "dates": ""}], '
+    '"education": [{"degree": "", "university": "", "year": ""}], '
+    '"projects": ["Name: one-line description"], "certifications": ["Name (issuer, year)"], '
+    '"awards": ["Name (issuer, year)"]}. Use [] for missing sections and empty strings '
+    "for missing contact or entry details. "
+    "Extract every work entry, including internships, in newest-first order. Keep internships "
+    "identifiable in their titles. Include all education entries, even ongoing studies or "
+    "entries without a graduation year. Keep the degree or field of study and school when present. "
+    "For years_experience, sum the months in non-internship jobs without double-counting "
+    "overlapping periods and divide by 12. Use a stated role duration when its dates are missing "
+    "or placeholders. For example, nine months of employment is 0.75 years. Use zero only when no "
+    "non-internship duration is known."
 )
 
 
@@ -47,42 +58,42 @@ class AIBadResponse(AppException):
     status_code = 502
 
 
-def _client() -> AsyncAzureOpenAI:
-    if not (
-        settings.azure_openai_endpoint
-        and settings.azure_openai_api_key
-        and settings.azure_openai_deployment
-    ):
+def _client() -> AsyncOpenAI:
+    endpoint = settings.azure_openai_endpoint
+    if not (endpoint and settings.azure_openai_api_key and settings.azure_openai_deployment):
         raise AIUnavailable("Azure OpenAI is not configured.")
-    return AsyncAzureOpenAI(
-        azure_endpoint=settings.azure_openai_endpoint,
+    base_url = endpoint.rstrip("/")
+    if not base_url.endswith("/openai/v1"):
+        base_url += "/openai/v1"
+    return AsyncOpenAI(
+        base_url=base_url,
         api_key=settings.azure_openai_api_key,
-        api_version=settings.azure_openai_api_version,
         timeout=TIMEOUT_SECONDS,
     )
 
 
-async def _chat_json[T: BaseModel](system: str, user: str, schema: type[T]) -> T:
-    """One JSON-mode chat call, parsed into `schema`; raises AIBadResponse on bad output."""
-    client = _client()
-    resp = await client.chat.completions.create(
-        model=settings.azure_openai_deployment,
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-        response_format={"type": "json_object"},
-    )
+async def _request_json[T: BaseModel](system: str, user: str, schema: type[T]) -> T:
+    """Request JSON from Azure and validate it against the supplied schema."""
+    async with _client() as client:
+        resp = await client.responses.create(
+            model=settings.azure_openai_deployment,
+            input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            text={"format": {"type": "json_object"}},
+            store=False,
+        )
     try:
-        return schema.model_validate_json(resp.choices[0].message.content or "")
-    except (ValidationError, ValueError, TypeError) as exc:
-        logger.warning("Invalid AI response: %s", exc)
+        return schema.model_validate_json(resp.output_text)
+    except ValidationError as exc:
+        logger.warning("Invalid AI response for schema %s", schema.__name__)
         raise AIBadResponse("AI returned an invalid response.") from exc
 
 
 async def enrich(job_text: str, profile_text: str) -> Enrichment:
-    """Summarise a job and score its fit against the profile with one chat call."""
+    """Summarise a job and score its fit against the profile with one AI request."""
     user = f"PROFILE:\n{profile_text}\n\nJOB:\n{job_text[:MAX_DESCRIPTION_CHARS]}"
-    return await _chat_json(SYSTEM_PROMPT, user, Enrichment)
+    return await _request_json(SYSTEM_PROMPT, user, Enrichment)
 
 
 async def extract_profile(cv_text: str) -> CVExtraction:
     """Turn raw CV text into structured profile data with one chat call."""
-    return await _chat_json(CV_PROMPT, cv_text[:MAX_CV_CHARS], CVExtraction)
+    return await _request_json(CV_PROMPT, cv_text[:MAX_CV_CHARS], CVExtraction)

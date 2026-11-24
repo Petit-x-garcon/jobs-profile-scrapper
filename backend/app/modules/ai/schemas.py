@@ -1,4 +1,6 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+from app.modules.profile.schemas import Contact, EducationEntry, WorkEntry
 
 
 class Enrichment(BaseModel):
@@ -21,16 +23,18 @@ class CVExtraction(BaseModel):
     """Profile data the AI extracted from a CV."""
 
     headline: str
+    contact: Contact = Contact()
     summary: str
     skills: list[str] = []
-    years_experience: int = 0
-    experience: list[str] = []
-    education: list[str] = []
+    years_experience: float = Field(default=0, allow_inf_nan=False)
+    experience: list[str | WorkEntry] = []
+    education: list[str | EducationEntry] = []
     projects: list[str] = []
     certifications: list[str] = []
+    awards: list[str] = []
 
     @field_validator("years_experience", mode="before")
     @classmethod
-    def non_negative(cls, v: object) -> int:
-        """Coerce to a non-negative whole number of years."""
-        return max(0, round(float(v or 0)))  # type: ignore[arg-type]
+    def non_negative(cls, v: object) -> float:
+        """Keep fractional years and prevent negative totals."""
+        return max(0.0, round(float(v or 0), 2))  # type: ignore[arg-type]

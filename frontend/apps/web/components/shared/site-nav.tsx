@@ -5,16 +5,23 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "cn"
 
+import { useCrawlStatus } from "@/hooks/use-site-check"
 import { ThemeToggle } from "@/components/shared/theme-toggle"
 
 const LINKS = [
   { href: "/", label: "Jobs" },
+  { href: "/rankings", label: "Job rankings" },
   { href: "/profile", label: "Profile" },
   { href: "/site-check", label: "Site check" },
 ]
 
 export function SiteNav() {
   const pathname = usePathname()
+  const { data: run } = useCrawlStatus()
+  const progress =
+    run && ["queued", "running"].includes(run.status)
+      ? `${run.checked}/${run.discovered}`
+      : null
   return (
     <header className="border-b bg-card">
       <nav className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center gap-1 px-4 sm:px-8">
@@ -39,6 +46,14 @@ export function SiteNav() {
             )}
           >
             {label}
+            {href === "/site-check" && progress && (
+              <span
+                className="ml-1 text-xs tabular-nums"
+                aria-label={`${progress} pages checked`}
+              >
+                {progress}
+              </span>
+            )}
           </Link>
         ))}
         <div className="ml-auto">

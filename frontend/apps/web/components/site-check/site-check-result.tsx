@@ -1,8 +1,8 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { Alert, AlertDescription } from "@workspace/ui/components/alert"
 import { Button } from "@workspace/ui/components/button"
-import { addScrapeSite } from "@/lib/api/site-check"
+import { addScrapeSite, SOURCES_KEY } from "@/lib/api/site-check"
 import { Badge } from "@workspace/ui/components/badge"
 import {
   Card,
@@ -65,23 +65,22 @@ export function SiteCheckResult({ check }: { check: SiteCheck }) {
           )}
           <Row label="HTTP status">{check.http_status ?? "No response"}</Row>
           <Row label="robots.txt">{ROBOTS[check.robots_status]}</Row>
+          {check.job_count != null && (
+            <Row label="Jobs on page">{check.job_count}</Row>
+          )}
         </dl>
         {check.result === "successful" && <AddScrapeSite url={check.url} />}
-        {check.content_preview && (
-          <div className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-medium">Content preview</h3>
-            <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap">
-              {check.content_preview}
-            </pre>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
 }
 
 function AddScrapeSite({ url }: { url: string }) {
-  const add = useMutation({ mutationFn: addScrapeSite })
+  const cache = useQueryClient()
+  const add = useMutation({
+    mutationFn: addScrapeSite,
+    onSuccess: () => cache.invalidateQueries({ queryKey: SOURCES_KEY }),
+  })
   return (
     <div className="space-y-2">
       <Button
@@ -93,12 +92,12 @@ function AddScrapeSite({ url }: { url: string }) {
           ? "Added to scraper"
           : add.isPending
             ? "Adding…"
-            : "Add to scraper"}
+            : "Save site for future scrapes"}
       </Button>
       <p className="text-sm text-muted-foreground" role="status">
         {add.isSuccess
           ? "This URL will be checked during future scrape runs."
-          : "Future scrape runs will import a job if this URL contains structured job posting data."}
+          : "Future scrape runs will follow links on this site and import job postings."}
       </p>
       {add.error && (
         <Alert variant="destructive">
